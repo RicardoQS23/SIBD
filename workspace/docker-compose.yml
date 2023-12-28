@@ -84,7 +84,7 @@ services:
       depends_on:
         - postgres
       environment:
-        DATABASE_URL: postgres://bank:bank@postgres/bank
+        DATABASE_URL: postgres://clinic:clinic@postgres/clinic
         FLASK_APP: app
         FLASK_ENV: development
         FLASK_DEBUG: 1

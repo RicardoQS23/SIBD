@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Appointments & Consultations{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  {% for appointment in appointments %}
+    <article class="post">
+      <header>
+        <div>
+          <h1>{{ appointment['vat_doctor'] }}</h1>
+          <div class="about">{{ appointment['date_timestamp'] }}</div>
+        </div>
+        <a class="action" href="{{ url_for('consultation_details_view', consultation_date=appointment['date_timestamp']) }}">View</a>
+      </header>
+      <p class="body">{{ appointment['description'] }}</p>
+    </article>
+    {% if not loop.last %}
+      <hr>
+    {% endif %}
+  {% endfor %}
+{% endblock %}
+

@@ -1,10 +1,10 @@
 <!doctype html>
-<title>{% block title %}{% endblock %} - Bank</title>
+<title>{% block title %}{% endblock %} - Clinic</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <nav>
-  <h1><a href="/">Bank</a></h1>
+  <h1><a href="/">Clinic</a></h1>
   <ul>
-    <li><a href="{{ url_for('account_index') }}">Accounts</a>
+    <li><a href="{{ url_for('clients_index') }}">Clients</a>
     </ul>
   </nav>
   <section class="content">
