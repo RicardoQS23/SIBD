@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Doctors{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post" action="{{ url_for('doctors_index') }}">
+    <input name="date" id="date" type="date" value="{{ request.form['date'] }}">
+    <label for="time">Time:</label>
+    <select id="time" name="time">
+        {% for hour in range(9, 18) %} <!-- 9 AM to 5 PM -->
+        <option value="{{ '%02d:00' % hour }}">{{ '%02d:00' % hour }}</option>
+        {% endfor %}
+    </select>
+    <input type="submit" value="Search">
+  </form>
+  {% for doctor in doctors %}
+    <article class="post">
+      <header>
+        <div>
+          <h1>{{ doctor['vat_id'] }}</h1>
+          <div class="about">{{ doctor['name'] }}</div>
+        </div>
+      </header>
+    </article>
+    {% if not loop.last %}
+    <hr>
+    {% endif %}
+  {% endfor %}
+{% endblock %}
+

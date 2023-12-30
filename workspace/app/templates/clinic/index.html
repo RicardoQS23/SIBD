@@ -2,16 +2,27 @@
 
 {% block header %}
   <h1>{% block title %}Clients{% endblock %}</h1>
+  <ul>
+    <a href="{{ url_for('create_client_view') }}">Add Client</a>
+  </ul>
 {% endblock %}
 
 {% block content %}
+  <form method="post" action="{{ url_for('clients_index') }}">
+    <input name="vat_id" id="vat_id" type="text" size="20" value="{{ request.form['vat_id'] }}" placeholder="Vat Id">
+    <input name="name" id="name" type="text" size="80" value="{{ request.form['name'] }}" placeholder="Name">
+    <input name="location" id="location" type="text" size="255" value="{{ request.form['location'] }}" placeholder="Location">
+    <input type="submit" value="Search">
+  </form>
   {% for client in clients %}
     <article class="post">
       <header>
         <div>
           <h1>{{ client['vat_id'] }}</h1>
           <div class="about">{{ client['name'] }}</div>
+          <div class="about">{{ client['city'] +", "+ client['street'] +", "+ client['zip_code'] }}</div>
         </div>
+        <a class="action" href="{{ url_for('client_appointment_view', client_id=client['vat_id']) }}">View</a>
       </header>
     </article>
     {% if not loop.last %}
@@ -20,4 +31,3 @@
   {% endfor %}
 {% endblock %}
 
-<!--a class="action" href="{{ url_for('client_appointment_view', client_id=client['vat_id']) }}">View</a-->

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Create Client{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<form action="{{ url_for('create_client_view')}}" method="post">
+    <label for="vat_id">VAT ID*</label>
+    <input name="vat_id" id="vat_id" type="text" size="20" placeholder="vat id" value="{{ request.form['vat_id'] }}" required>
+  
+    <label for="name">Name*</label>
+    <input name="name" id="name" type="text" size="80" placeholder="name" value="{{ request.form['name'] }}" required>
+  
+    <label for="birth_date">Birth Date*</label>
+    <input name="birth_date" id="birth_date" type="date" placeholder="YYYY-MM-DD" value="{{ request.form['birth_date'] }}" required>
+  
+    <label for="street">Street*</label>
+    <input name="street" id="street" type="text" size="30" placeholder="street" value="{{ request.form['street'] }}" required>
+  
+    <label for="city">City</label>
+    <input name="city" id="city" type="text" size="30" placeholder="city" value="{{ request.form['city'] }}" >
+  
+    <label for="zip_code">Zip Code</label>
+    <input name="zip_code" id="zip_code" type="text" size="12" placeholder="XXXX-XXX" value="{{ request.form['zip_code'] }}" >
+  
+    <label for="gender">Gender</label>
+    <input name="gender" id="gender" type="text" size="1" placeholder="M/F" value="{{ request.form['gender'] }}" >
+  
+    <input type="submit" value="Save">
+  </form>
+{% endblock %}
