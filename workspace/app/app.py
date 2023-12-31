@@ -161,14 +161,57 @@ def fetch_doctors(timestamp=None):
             doctors = cur.fetchall()
     return doctors
 
+
+def fetch_nurses():
+    with psycopg.connect(conninfo=DATABASE_URL) as conn:
+        with conn.cursor(row_factory=namedtuple_row) as cur:
+            cur.execute(
+                """
+                SELECT n.vat_id AS vat_id, e.name AS name
+                FROM nurse AS n
+                JOIN employee AS e ON e.vat_id = n.vat_id
+                """,
+                {},
+            )
+            nurses = cur.fetchall()
+    return nurses
+
+def fetch_diag():
+    with psycopg.connect(conninfo=DATABASE_URL) as conn:
+        with conn.cursor(row_factory=namedtuple_row) as cur:
+            cur.execute(
+                """
+                SELECT ID, description
+                FROM diagnostic_code
+                """,
+                {},
+            )
+            diag = cur.fetchall()
+    return diag
+
+
+def fetch_meds():
+    with psycopg.connect(conninfo=DATABASE_URL) as conn:
+        with conn.cursor(row_factory=namedtuple_row) as cur:
+            cur.execute(
+                """
+                SELECT name, lab
+                FROM medication
+                """,
+                {},
+            )
+            meds = cur.fetchall()
+    return meds
+
 def fetch_appointments_consultations(client_id):
     with psycopg.connect(conninfo=DATABASE_URL) as conn:
             with conn.cursor(row_factory=namedtuple_row) as cur:
                 cur.execute(
                     """
-                    SELECT ap.vat_doctor AS vat_doctor, ap.date_timestamp AS date_timestamp, ap.description AS description
+                    SELECT ap.vat_doctor AS vat_doctor, e.name AS doctor_name, ap.date_timestamp AS date_timestamp, ap.description AS description
                     FROM client AS c
                     JOIN appointment AS ap ON c.vat_id = ap.vat_client
+                    JOIN employee AS e ON e.vat_id = ap.vat_doctor
                     LEFT JOIN consultation AS co ON ap.vat_doctor = co.vat_doctor AND ap.date_timestamp = co.date_timestamp
                     WHERE ap.vat_client = %(client_id)s
                     ORDER BY ap.date_timestamp;
@@ -177,6 +220,43 @@ def fetch_appointments_consultations(client_id):
                 )
                 appointments = cur.fetchall()
                 return appointments
+
+def fetch_consultation_details(client_id, consultation_date, doctor_id):
+    log.debug(f"Client ID: {client_id} DateTime: {consultation_date} Doctor ID: {doctor_id}")
+    with psycopg.connect(conninfo=DATABASE_URL) as conn:
+        with conn.cursor(row_factory=namedtuple_row) as cur:
+            cur.execute(
+                """
+                SELECT ap.vat_doctor AS vat_doctor, ap.date_timestamp AS date_timestamp, ap.description AS description,
+                    ca.vat_nurse AS nurse_id, co.SOAP_S AS soap_s, co.SOAP_O AS soap_o, co.SOAP_A AS soap_a, co.SOAP_P AS soap_p,
+                    d.description AS diag_desc, pr.name AS med_name, pr.lab AS lab, pr.dosage AS dosage, pr.description AS pr_description
+                FROM client AS c
+                    JOIN appointment AS ap ON c.vat_id = ap.vat_client
+                LEFT JOIN consultation AS co ON ap.vat_doctor = co.vat_doctor AND ap.date_timestamp = co.date_timestamp
+                LEFT JOIN consultation_assistant AS ca ON ap.vat_doctor = ca.vat_doctor AND ap.date_timestamp = ca.date_timestamp
+                LEFT JOIN consultation_diagnostic AS cd ON ap.vat_doctor = cd.vat_doctor AND ap.date_timestamp = cd.date_timestamp
+                LEFT JOIN prescription AS pr ON pr.vat_doctor = cd.vat_doctor AND pr.date_timestamp = cd.date_timestamp AND pr.id = cd.id
+                LEFT JOIN diagnostic_code AS d ON pr.id = d.id
+                WHERE ap.vat_client = %(client_id)s AND ap.date_timestamp = %(consultation_date)s AND ap.vat_doctor = %(doctor_id)s;
+                """,
+                {"client_id":client_id, "consultation_date":consultation_date, "doctor_id":doctor_id},
+            )
+            appointment_details = cur.fetchall()
+            log.debug(appointment_details)
+        return appointment_details
+
+def query_lab_for_medication(med_name):
+    with psycopg.connect(conninfo=DATABASE_URL) as conn:
+        with conn.cursor(row_factory=namedtuple_row) as cur:
+            cur.execute(
+                """
+                SELECT lab
+                FROM medication
+                WHERE name = %(med_name)s;
+                """,
+                {"med_name": med_name}),
+            lab = cur.fetchone()
+    return lab
 
 def create_appointment(doctor_id, timestamp_str, client_id, description):
     log.debug(f"Client Id:{client_id} Timestamp: {timestamp_str} Doctor Id: {doctor_id} Description:{description}")
@@ -191,6 +271,42 @@ def create_appointment(doctor_id, timestamp_str, client_id, description):
                 conn.commit()
     except Exception as e:
         log.error(f"Error in create_appointment: {e}")
+
+def create_consultation(doctor_id, nurse_id, consultation_date, diag_id, soap_s, soap_o, soap_a, soap_p, prescriptions):
+    log.debug(f"Doctor Id:{doctor_id} Nurse Id:{nurse_id} Timestamp: {consultation_date} ID: {diag_id}, SOAP S: {soap_s} SOAP O: {soap_o} SOAP A: {soap_a} SOAP P: {soap_p} Prescriptions: {prescriptions}")
+    try:
+        with psycopg.connect(conninfo=DATABASE_URL) as conn:
+            with conn.cursor(row_factory=namedtuple_row) as cur:
+                query = """
+                        INSERT INTO consultation
+                        VALUES (%s, %s, %s, %s, %s, %s);
+                        """
+                cur.execute(query, (doctor_id, consultation_date, soap_s, soap_o, soap_a, soap_p))
+                conn.commit()
+                
+                query = """
+                        INSERT INTO consultation_assistant
+                        VALUES (%s, %s, %s);
+                        """
+                cur.execute(query, (doctor_id, consultation_date, nurse_id))
+                conn.commit()
+                
+                cur.execute("""
+                    INSERT INTO consultation_diagnostic
+                    VALUES (%s, %s, %s);
+                """, (doctor_id, consultation_date, diag_id))
+                conn.commit()
+                
+                for presc in prescriptions:
+                    cur.execute("""
+                        INSERT INTO prescription
+                        VALUES (%s, %s, %s, %s, %s, %s, %s);
+                    """, (doctor_id, consultation_date, diag_id, presc['med_name'], presc['med_lab'], presc['dosage'], presc['description']))
+                conn.commit()
+                
+    except Exception as e:
+        log.error(f"Error in create_consultation: {e}")
+
 
 @app.route("/", methods=("GET", "POST",))
 @app.route("/clients", methods=("GET", "POST",))
@@ -271,144 +387,67 @@ def create_appointment_view(client_id):
 
     return render_template("clinic/create_appointment.html", client_id=client_id, doctors=doctors)
 
+@app.route("/create_consultation/<client_id>/<doctor_id>/<consultation_date>", methods=("GET","POST",))
+def create_consultation_view(client_id, doctor_id, consultation_date):
+    """Show client's appointments and consultations."""
+    log.debug(f"Doctor ID: {doctor_id} Date: {consultation_date}")
+    nurses = fetch_nurses()
+    medications = fetch_meds()
+    diagnostic_codes = fetch_diag()
+    if request.method == "POST":
+        log.debug("POSTTTT")
 
-@app.route("/appointments/<client_id>/<consultation_date>", methods=("GET",))
-def consultation_details_view(client_id, consultation_date):
+        nurse_id = request.form.get("nurse_id")
+        soap_s = request.form.get("soap_s")
+        soap_o = request.form.get("soap_o")
+        soap_a = request.form.get("soap_a")
+        soap_p = request.form.get("soap_p")
+        diag_id = request.form.get("diag_code")
+        # Diagnostic Codes
+        num_presc = int(request.form.get("num_presc"))
+        log.debug(f"NUM PRESC: {num_presc}")
+        prescriptions = []
+        for i in range(num_presc):
+            log.debug("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            med_name = request.form.getlist("med_name[]")[i]
+            log.debug(med_name)
+            med_lab = query_lab_for_medication(med_name)[0]
+            dosage = request.form.getlist("dosage[]")[i]
+            description = request.form.getlist("description[]")[i]
+            log.debug(f"MED NAME: {med_name} MED LAB: {med_lab} DOSAGE: {dosage} DESCRIPTION: {description}")
+            prescriptions.append({
+                "med_name": med_name,
+                "med_lab": med_lab,
+                "dosage": dosage,
+                "description": description
+            })
+        log.debug(f"Doctor ID: {doctor_id} Date: {consultation_date}")
+        create_consultation(doctor_id, nurse_id, consultation_date, diag_id, soap_s, soap_o, soap_a, soap_p, prescriptions)
+        return redirect(url_for('consultation_details_view', client_id=client_id, doctor_id=doctor_id, consultation_date=consultation_date))
+
+    else:
+        log.debug("HEYYYY")
+        return render_template("clinic/create_consultation.html", client_id=client_id, doctor_id=doctor_id, consultation_date=consultation_date, nurses=nurses, medications=medications, diagnostic_codes=diagnostic_codes)
+
+@app.route("/consultation/<client_id>/<doctor_id>/<consultation_date>", methods=("GET",))
+def consultation_details_view(client_id, doctor_id, consultation_date):
     """Show client's consultation details."""
+    log.debug(f"Doctor ID: {doctor_id} Date: {consultation_date}")
+    appointment_details = fetch_consultation_details(client_id, consultation_date, doctor_id)
+    log.debug(appointment_details[0].med_name)
+    prescription = None
+    if appointment_details[0].med_name != None:
+        prescription = "\n".join([
+            f"{appointment_detail.med_name}, {appointment_detail.lab}, {appointment_detail.dosage}, {appointment_detail.pr_description}"
+            for appointment_detail in appointment_details
+        ])
+    return render_template("clinic/consultation_profile.html", client_id=client_id, appointment_details=appointment_details[0], prescription=prescription)
 
-    with psycopg.connect(conninfo=DATABASE_URL) as conn:
-        with conn.cursor(row_factory=namedtuple_row) as cur:
-            cur.execute(
-                """
-                SELECT ap.vat_doctor AS vat_doctor, ap.date_timestamp AS date_timestamp, ap.description AS description,
-                       ca.vat_nurse AS nurse_id, co.SOAP_S AS soap_s, co.SOAP_O AS soap_o, co.SOAP_A AS soap_a, co.SOAP_P AS soap_p
-                FROM client AS c
-                JOIN appointment AS ap ON c.vat_id = ap.vat_client
-                JOIN consultation AS co ON ap.vat_doctor = co.vat_doctor AND ap.date_timestamp = co.date_timestamp
-                JOIN consultation_assistant AS ca ON ap.vat_doctor = ca.vat_doctor AND ap.date_timestamp = ca.date_timestamp
-                WHERE ap.vat_client = %(client_id)s AND ap.consultation_date = %(consultation_date)s;
-                """,
-                {"client_id":client_id, "consultation_date":consultation_date},
-            )
-            appointment_details = cur.fetchone()
-            log.debug(f"Found {cur.rowcount} rows.")
-
-    return render_template("clinic/appointment_profile.html", client_id=client_id, appointment_details=appointment_details)
+@app.route("/ping", methods=("GET",))
+def ping():
+    log.debug("ping!")
+    return jsonify({"message": "pong!", "status": "success"})
 
 if __name__ == "__main__":
     app.run(debug=True)
 
-# @app.route("/accounts/<account_number>/update", methods=("GET",))
-# def account_update_view(account_number):
-#     """Show the page to update the account balance."""
-
-#     with psycopg.connect(conninfo=DATABASE_URL) as conn:
-#         with conn.cursor(row_factory=namedtuple_row) as cur:
-#             account = cur.execute(
-#                 """
-#                 SELECT account_number, branch_name, balance
-#                 FROM account
-#                 WHERE account_number = %(account_number)s;
-#                 """,
-#                 {"account_number": account_number},
-#             ).fetchone()
-#             log.debug(f"Found {cur.rowcount} rows.")
-
-#     return render_template("account/update.html", account=account)
-
-                # SELECT DISTINCT ap.vat_doctor AS vat_doctor, ap.date_timestamp AS date_timestamp, ap.description AS description
-                # FROM client AS c
-                # JOIN appointment AS ap ON c.vat_id = ap.vat_client
-                # JOIN consultation AS co ON ap.VAT_doctor = co.vat_doctor AND ap.date_timestamp = co.date_timestamp
-# @app.route("/accounts", methods=("GET",))
-# def account_index():
-#     """Show all the accounts, most recent first."""
-
-#     with psycopg.connect(conninfo=DATABASE_URL) as conn:
-#         with conn.cursor(row_factory=namedtuple_row) as cur:
-#             accounts = cur.execute(
-#                 """
-#                 SELECT account_number, branch_name, balance
-#                 FROM account
-#                 ORDER BY account_number DESC;
-#                 """,
-#                 {},
-#             ).fetchall()
-#             log.debug(f"Found {cur.rowcount} rows.")
-
-#     return render_template("account/index.html", accounts=accounts)
-
-
-
-# @app.route("/accounts/<account_number>/update", methods=("POST",))
-# def account_update_save(account_number):
-#     """Update the account balance."""
-
-#     balance = request.form["balance"]
-
-#     error = None
-
-#     if not balance:
-#         error = "Balance is required."
-#     if not is_decimal(balance):
-#         error = "Balance is required to be decimal."
-
-#     if error is not None:
-#         flash(error)
-#     else:
-#         with psycopg.connect(conninfo=DATABASE_URL) as conn:
-#             with conn.cursor(row_factory=namedtuple_row) as cur:
-#                 cur.execute(
-#                     """
-#                     UPDATE account
-#                     SET balance = %(balance)s
-#                     WHERE account_number = %(account_number)s;
-#                     """,
-#                     {"account_number": account_number, "balance": balance},
-#                 )
-#             conn.commit()
-#         return redirect(url_for("account_index"))
-
-
-# @app.route("/accounts/<account_number>/delete", methods=("POST",))
-# def account_delete(account_number):
-#     """Delete the account."""
-
-#     with psycopg.connect(conninfo=DATABASE_URL) as conn:
-#         with conn.cursor(row_factory=namedtuple_row) as cur:
-#             cur.execute(
-#                 """
-#                 DELETE FROM account
-#                 WHERE account_number = %(account_number)s;
-#                 """,
-#                 {"account_number": account_number},
-#             )
-#         conn.commit()
-#     return redirect(url_for("account_index"))
-
-# @app.route("/", methods=["GET", "POST"])
-# @app.route("/login", methods=["GET", "POST"])
-# def login_route():
-#     if request.method == 'POST':
-#         entered_vat_id = request.form.get('client_id')
-#         print(DATABASE_URL, file=sys.stderr)
-#         with psycopg.connect(conninfo=DATABASE_URL) as conn:
-#             with conn.cursor(row_factory=namedtuple_row) as cur:
-#                 cur.execute(
-#                     """
-#                     SELECT vat_id
-#                     FROM client;
-#                     """
-#                 )
-#                 client_vat_ids = cur.fetchall()
-#                 if entered_vat_id in client_vat_ids:
-#                     return redirect(url_for('clients'))
-#                 else:
-#                     return render_template('clinic/index.html', error_message='Invalid VAT ID')
-                
-#     return render_template('clinic/index.html')
-
-# @app.route("/ping", methods=("GET",))
-# def ping():
-#     log.debug("ping!")
-#     return jsonify({"message": "pong!", "status": "success"})

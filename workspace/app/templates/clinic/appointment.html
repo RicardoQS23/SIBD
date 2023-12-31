@@ -2,7 +2,8 @@
 
 {% block header %}
   <h1>{% block title %}Client {{ client_id }} | Appointments & Consultations{% endblock %}</h1>
-  <a href="{{ url_for('create_appointment_view', client_id = client_id) }}">Create Appointment</a>
+    <a class="view-link back-link" href="{{ url_for('create_appointment_view', client_id = client_id) }}">Create Appointment</a>
+    <a class="view-link" href="/">Back</a>
 {% endblock %}
 
 {% block content %}
@@ -11,11 +12,11 @@
       <header>
         <div>
           <h1>{{ appointment['vat_doctor'] }}</h1>
+          <div class="about">{{ appointment['doctor_name'] }}</div>
           <div class="about">{{ appointment['date_timestamp'] }}</div>
         </div>
-        <a class="action" href="{{ url_for('consultation_details_view', client_id = client_id, consultation_date=appointment['date_timestamp']) }}">View</a>
+        <a class="view-link" href="{{ url_for('consultation_details_view', client_id=client_id, consultation_date=appointment['date_timestamp'], doctor_id=appointment['vat_doctor']) }}">View Details</a>
       </header>
-      <p class="body">{{ appointment['description'] }}</p>
     </article>
     {% if not loop.last %}
       <hr>

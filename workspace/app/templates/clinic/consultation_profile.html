@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Client {{ client_id }} | Consultation Details: {{ appointment_details['date_timestamp'] }}{% endblock %}</h1>
+    {% if not appointment_details['nurse_id'] %}
+    <a class="view-link back-link"href="{{ url_for('create_consultation_view', client_id=client_id, doctor_id=appointment_details['vat_doctor'], consultation_date=appointment_details['date_timestamp']) }}">Create Consultation</a>
+    {% endif %}
+    <a class="view-link" href="/appointments/{{ client_id }}">Back</a>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="doctor_id">Doctor</label>
+    <input name="doctor_id" id="doctor_id" type="text" value="{{ appointment_details['vat_doctor']}}" disabled>
+    <label for="nurse_id">Assistant Nurse</label>
+    <input name="nurse_id" id="nurse_id" type="text" value="{{ request.form['nurse_id']  or appointment_details['nurse_id']}}" disabled>
+    <label for="description">Appointment Description</label>
+    <textarea name="description" id="description" type="text" disabled>{{ appointment_details['description']}}</textarea>
+    <label for="soap_o">Objective Observation</label>
+    <textarea name="soap_s" id="soap_s" type="text" disabled>{{ appointment_details['soap_s']}}</textarea>
+    <label for="soap_o">Objective Observation</label>
+    <textarea name="soap_o" id="soap_o" type="text" disabled>{{ appointment_details['soap_o']}}</textarea>
+    <label for="soap_a">Assessment</label>
+    <textarea name="soap_a" id="soap_a" type="text" disabled>{{ appointment_details['soap_a']}}</textarea>
+    <label for="soap_p">Plan</label>
+    <textarea name="soap_p" id="soap_p" type="text" disabled>{{ appointment_details['soap_p']}}</textarea>
+    <label for="diag_desc">Diagnostic Description</label>
+    <input name="diag_desc" id="diag_desc" type="text" value="{{ appointment_details['diag_desc']}}" disabled>
+    <label for="prescription">Prescription</label>
+    <textarea name="prescription" id="prescription" type="text" disabled>{{ prescription}}</textarea>
+  </form>
+{% endblock %}

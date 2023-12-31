@@ -2,9 +2,7 @@
 
 {% block header %}
   <h1>{% block title %}Clients{% endblock %}</h1>
-  <ul>
-    <a href="{{ url_for('create_client_view') }}">Add Client</a>
-  </ul>
+  <a class="view-link" href="/">Back</a>
 {% endblock %}
 
 {% block content %}
@@ -14,6 +12,7 @@
     <input name="location" id="location" type="text" size="255" value="{{ request.form['location'] }}" placeholder="Location">
     <input type="submit" value="Search">
   </form>
+  <hr>
   {% for client in clients %}
     <article class="post">
       <header>
@@ -22,7 +21,7 @@
           <div class="about">{{ client['name'] }}</div>
           <div class="about">{{ client['city'] +", "+ client['street'] +", "+ client['zip_code'] }}</div>
         </div>
-        <a class="action" href="{{ url_for('client_appointment_view', client_id=client['vat_id']) }}">View</a>
+        <a class="view-link" href="{{ url_for('client_appointment_view', client_id=client['vat_id']) }}">View Profile</a>
       </header>
     </article>
     {% if not loop.last %}

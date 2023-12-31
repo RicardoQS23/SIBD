@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Client {{ client_id }} | Create Consultation{% endblock %}</h1>
+  <a class="view-link" href="/consultation/{{ client_id }}/{{ doctor_id }}/{{ consultation_date }}">Back</a>
+{% endblock %}
+{% block content %}
+<form action="{{ url_for('create_consultation_view', client_id=client_id, doctor_id=doctor_id, consultation_date=consultation_date)}}" method="post">
+
+    <label for="nurse_id">Consultation Assistant*</label>
+    <select id="nurse_id" name="nurse_id" required>
+        {% for nurse in nurses %}
+        <option value="{{ nurse['vat_id'] }}">{{ nurse['name'] }}</option>
+        {% endfor %}
+    </select>
+
+    <label for="soap_s">Subjective Observation*</label>
+    <textarea name="soap_s" id="soap_s" type="text" required>{{ request.form['soap_s'] }}</textarea>
+
+    <label for="soap_o">Objective Observation*</label>
+    <textarea name="soap_o" id="soap_o" type="text" required>{{ request.form['soap_o'] }}</textarea>
+
+    <label for="soap_a">Assessment*</label>
+    <textarea name="soap_a" id="soap_a" type="text" required>{{ request.form['soap_a'] }}</textarea>
+
+    <label for="soap_p">Plan*</label>
+    <textarea name="soap_p" id="soap_p" type="text" required>{{ request.form['soap_p'] }}</textarea>
+
+    <label for="diag_code">Diagnostic Code*</label>
+    <select id="diag_code" name="diag_code" required>
+        {% for diagnostic_code in diagnostic_codes %}
+        <option value="{{ diagnostic_code['id'] }}">{{ diagnostic_code['description'] }}</option>
+        {% endfor %}
+    </select>
+
+    <div id="consultation-diagnostics">
+        <!-- Dynamic section for consultation diagnostics -->
+        {% for index in range(1) %}
+        <div class="diagnostic-section">
+                <h2>Consultation Diagnostic {{ index + 1 }}</h2>
+
+                <label for="med_name">Medication Name*</label>
+                <select id="med_name" name="med_name[]" required>
+                    {% for medication in medications %}
+                    <option value="{{ medication['name'] }}">{{ medication['name'] }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="dosage">Dosage*</label>
+                <input name="dosage[]" id="dosage" type="text" size="20" required>
+
+                <label for="description">Description*</label>
+                <textarea name="description[]" id="description" type="text" required></textarea>
+
+            </div>
+        {% endfor %}
+    </div>
+
+    <button type="button" id="add-diagnostic">Add Another Diagnostic</button>
+    
+    <input type="hidden" id="num-prescriptions" name="num_presc" value="1">
+
+    <input class="save-link" type="submit" value="Save">
+</form>
+
+<script>
+    var diagCodesSelect = document.getElementById("diag_code");
+    diagCodesSelect.size = Math.min(diagCodesSelect.length, 10); // Set a maximum size, e.g., 5
+
+    // Add event listener for the "Add Another Diagnostic" button
+    var addDiagnosticButton = document.getElementById("add-diagnostic");
+    addDiagnosticButton.addEventListener("click", function() {
+        var consultationDiagnostics = document.getElementById("consultation-diagnostics");
+
+        // Clone the first diagnostic section
+        var newDiagnosticSection = consultationDiagnostics.querySelector(".diagnostic-section").cloneNode(true);
+
+        // Increment the diagnostic number in the header
+        var diagnosticNumber = consultationDiagnostics.querySelectorAll(".diagnostic-section").length + 1;
+        newDiagnosticSection.querySelector("h2").innerText = "Consultation Diagnostic " + diagnosticNumber;
+
+        // Clear values in the cloned section
+        newDiagnosticSection.querySelectorAll("select, input, textarea").forEach(function(element) {
+            element.value = "";
+        });
+
+        consultationDiagnostics.appendChild(newDiagnosticSection);
+
+        // Update the number of prescriptions hidden field
+        document.getElementById("num-prescriptions").value = diagnosticNumber;
+
+    });
+</script>
+{% endblock %}
+
+
