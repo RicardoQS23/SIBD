@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Dashboard | Consultations{% endblock %}</h1>
+  <a class="view-link" href="/">Back</a>
+{% endblock %}
+
+
+{% block content %}
+    {% for client in clients %}
+        <div class="client-box" onclick="toggleDetails('{{ client.id }}')">
+            <h3>{{ client.name }}</h3>
+            <div id="{{ client.id }}" class="consultation-details">
+                {% if client.consultations %}
+                <table border="2">
+                    <thead>
+                        <tr>
+                            <th>Consultation Date</th>
+                            <th>Number of Diagnostic Codes</th>
+                            <th>Number of Procedures</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for consultation in client.consultations %}
+                            <tr>
+                                <td>{{ consultation.date }}</td>
+                                <td>{{ consultation.num_diag }}</td>
+                                <td>{{ consultation.num_proc }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No consultations for this client.</p>
+            {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+
+    <script>
+        function toggleDetails(clientId) {
+            var details = document.getElementById(clientId);
+            details.style.display = details.style.display === 'none' ? 'block' : 'none';
+        }
+    </script>
+{% endblock %}
+
+

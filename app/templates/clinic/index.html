@@ -2,6 +2,8 @@
 
 {% block header %}
   <h1>{% block title %}Clients{% endblock %}</h1>
+  <a class="view-link back-link" href="{{ url_for('dashboard_index') }}">DashBoard</a>
+  <a class="view-link back-link" href="{{ url_for('create_client_view') }}">Create Client</a>
   <a class="view-link" href="/">Back</a>
 {% endblock %}
 

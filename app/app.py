@@ -221,25 +221,31 @@ def fetch_appointments_consultations(client_id):
                 appointments = cur.fetchall()
                 return appointments
 
+def fetch_clients_facts():
+    with psycopg.connect(conninfo=DATABASE_URL) as conn:
+            with conn.cursor(row_factory=namedtuple_row) as cur:
+                cur.execute(
+                    """
+                    SELECT vat_id, name, zip_code, date, num_diagnostic_codes, num_procedures
+                    FROM facts_consultation fc
+                    RIGHT JOIN client c ON fc.vat = c.vat_id
+                    ORDER BY vat_id
+                    """,
+                    {},
+                )
+                clients_facts = cur.fetchall()
+                return clients_facts
+
 def fetch_consultation_details(client_id, consultation_date, doctor_id):
     log.debug(f"Client ID: {client_id} DateTime: {consultation_date} Doctor ID: {doctor_id}")
     with psycopg.connect(conninfo=DATABASE_URL) as conn:
         with conn.cursor(row_factory=namedtuple_row) as cur:
             cur.execute(
                 """
-                SELECT ap.vat_doctor AS vat_doctor, ap.date_timestamp AS date_timestamp, ap.description AS description,
-                    ca.vat_nurse AS nurse_id, co.SOAP_S AS soap_s, co.SOAP_O AS soap_o, co.SOAP_A AS soap_a, co.SOAP_P AS soap_p,
-                    d.description AS diag_desc, pr.name AS med_name, pr.lab AS lab, pr.dosage AS dosage, pr.description AS pr_description
-                FROM client AS c
-                    JOIN appointment AS ap ON c.vat_id = ap.vat_client
-                LEFT JOIN consultation AS co ON ap.vat_doctor = co.vat_doctor AND ap.date_timestamp = co.date_timestamp
-                LEFT JOIN consultation_assistant AS ca ON ap.vat_doctor = ca.vat_doctor AND ap.date_timestamp = ca.date_timestamp
-                LEFT JOIN consultation_diagnostic AS cd ON ap.vat_doctor = cd.vat_doctor AND ap.date_timestamp = cd.date_timestamp
-                LEFT JOIN prescription AS pr ON pr.vat_doctor = cd.vat_doctor AND pr.date_timestamp = cd.date_timestamp AND pr.id = cd.id
-                LEFT JOIN diagnostic_code AS d ON pr.id = d.id
-                WHERE ap.vat_client = %(client_id)s AND ap.date_timestamp = %(consultation_date)s AND ap.vat_doctor = %(doctor_id)s;
+                SELECT * FROM consultation_details
+                WHERE vat_client = %(client_id)s AND vat_doctor = %(doctor_id)s AND date_timestamp = %(consultation_date)s ;
                 """,
-                {"client_id":client_id, "consultation_date":consultation_date, "doctor_id":doctor_id},
+                {"client_id":client_id, "doctor_id":doctor_id, "consultation_date":consultation_date},
             )
             appointment_details = cur.fetchall()
             log.debug(appointment_details)
@@ -307,6 +313,28 @@ def create_consultation(doctor_id, nurse_id, consultation_date, diag_id, soap_s,
     except Exception as e:
         log.error(f"Error in create_consultation: {e}")
 
+def aggregate_consultations(clients_data):
+    aggregated_clients = []
+    for client in clients_data:
+        update_idx = None
+        client_id, name, zip_code, date, num_diag, num_proc = client
+        log.debug(f"CLIENT: {client_id}")
+        consultation = {'date': date, 'num_diag': num_diag, 'num_proc': num_proc}
+
+        for idx, aggregated_client in enumerate(aggregated_clients):
+            log.debug(f"AGGREG: {aggregated_client}")
+            if aggregated_client['id'] == client_id:
+                update_idx = idx
+                break
+        if update_idx is not None:
+            # Client exists, append the new consultation to the existing client's consultations list
+            aggregated_clients[idx]['consultations'].append(consultation)
+        else:
+            # Client doesn't exist, create a new entry
+            new_client_entry = {'id': client_id, 'name': name, 'zip': zip_code, 'consultations': [consultation]}
+            aggregated_clients.append(new_client_entry)
+
+    return aggregated_clients
 
 @app.route("/", methods=("GET", "POST",))
 @app.route("/clients", methods=("GET", "POST",))
@@ -337,9 +365,16 @@ def doctors_index():
 
     return render_template("clinic/doctors.html", doctors=doctors)
 
+@app.route("/dashboard", methods=("GET",))
+def dashboard_index():
+    """Show the dashboard."""
+    client_facts = fetch_clients_facts()
+    log.debug(client_facts)
+    clients = aggregate_consultations(client_facts)
+    return render_template("clinic/dashboard.html", clients=clients)
 
 @app.route("/create_client", methods=("GET","POST",))
-def create_client_view(vat_id=None, name=None, birth_date=None, street=None, city=None, zip_code=None, gender=None):
+def create_client_view():
     """Create clients."""
     if request.method == "POST":
         vat_id = request.form.get("vat_id")
@@ -408,7 +443,6 @@ def create_consultation_view(client_id, doctor_id, consultation_date):
         log.debug(f"NUM PRESC: {num_presc}")
         prescriptions = []
         for i in range(num_presc):
-            log.debug("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
             med_name = request.form.getlist("med_name[]")[i]
             log.debug(med_name)
             med_lab = query_lab_for_medication(med_name)[0]

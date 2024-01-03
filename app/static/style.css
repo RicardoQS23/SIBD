@@ -184,3 +184,40 @@ input[type="submit"] {
 .save-link {
   margin-top: 20px; /* Adjust the margin for more space */
 }
+
+.client-box {
+  border: 1px solid #ccc;
+  margin: 10px;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.consultation-details {
+  display: none;
+  margin-top: 10px;
+  margin-left: 20px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  padding: 10px;
+  text-align: left;
+  border: 1px solid #ddd;
+}
+
+th {
+  background-color: #f2f2f2;
+}
+
+tr:hover {
+  background-color: #f5f5f5;
+}
+
+h3:hover {
+  text-decoration: underline;
+}
