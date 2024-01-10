@@ -11,11 +11,11 @@
         <div class="client-box" onclick="toggleDetails('{{ client.id }}')">
             <h3>{{ client.name }}</h3>
             <div id="{{ client.id }}" class="consultation-details">
-                {% if client.consultations %}
+                {% if client.consultations|length > 1 %}
                 <table border="2">
                     <thead>
                         <tr>
-                            <th>Consultation Date</th>
+                            <th>Year</th>
                             <th>Number of Diagnostic Codes</th>
                             <th>Number of Procedures</th>
                         </tr>
@@ -23,9 +23,9 @@
                     <tbody>
                         {% for consultation in client.consultations %}
                             <tr>
-                                <td>{{ consultation.date }}</td>
-                                <td>{{ consultation.num_diag }}</td>
-                                <td>{{ consultation.num_proc }}</td>
+                                <td>{% if consultation.year %}{{ consultation.year }}{% else %}Total{% endif %}</td>
+                                <td>{{ consultation.total_diagnostic_codes }}</td>
+                                <td>{{ consultation.total_procedures }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>

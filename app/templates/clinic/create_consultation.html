@@ -37,7 +37,7 @@
         <!-- Dynamic section for consultation diagnostics -->
         {% for index in range(1) %}
         <div class="diagnostic-section">
-                <h2>Consultation Diagnostic {{ index + 1 }}</h2>
+                <h2>Consultation Prescription {{ index + 1 }}</h2>
 
                 <label for="med_name">Medication Name*</label>
                 <select id="med_name" name="med_name[]" required>
@@ -77,7 +77,7 @@
 
         // Increment the diagnostic number in the header
         var diagnosticNumber = consultationDiagnostics.querySelectorAll(".diagnostic-section").length + 1;
-        newDiagnosticSection.querySelector("h2").innerText = "Consultation Diagnostic " + diagnosticNumber;
+        newDiagnosticSection.querySelector("h2").innerText = "Consultation Prescription " + diagnosticNumber;
 
         // Clear values in the cloned section
         newDiagnosticSection.querySelectorAll("select, input, textarea").forEach(function(element) {

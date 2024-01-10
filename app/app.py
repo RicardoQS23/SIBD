@@ -8,7 +8,7 @@ from flask import Flask, flash, jsonify, redirect, render_template, request, url
 from psycopg.rows import namedtuple_row
 from datetime import datetime
 # postgres://{user}:{password}@{hostname}:{port}/{database-name}
-DATABASE_URL = "postgres://clinic:clinic@postgres/clinic" #os.environ.get("DATABASE_URL", "postgres://clinic:clinic@postgres/clinic")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgres://ist1100071:bbwg6477@postgres/ist1100071")
 
 dictConfig(
     {
@@ -144,8 +144,8 @@ def fetch_doctors(timestamp=None):
                     SELECT d.VAT_ID AS vat_id, e.name AS name
                     FROM doctor AS d
                     JOIN employee AS e ON e.VAT_ID = d.VAT_ID
-                    LEFT JOIN consultation AS co ON d.VAT_ID = co.VAT_doctor AND co.date_timestamp = %(timestamp)s
-                    WHERE co.VAT_doctor IS NULL;
+                    LEFT JOIN appointment AS ap ON d.VAT_ID = ap.VAT_doctor AND ap.date_timestamp = %(timestamp)s
+                    WHERE ap.VAT_doctor IS NULL;
                     """,
                     {"timestamp": timestamp},
                 )
@@ -221,21 +221,6 @@ def fetch_appointments_consultations(client_id):
                 appointments = cur.fetchall()
                 return appointments
 
-def fetch_clients_facts():
-    with psycopg.connect(conninfo=DATABASE_URL) as conn:
-            with conn.cursor(row_factory=namedtuple_row) as cur:
-                cur.execute(
-                    """
-                    SELECT vat_id, name, zip_code, date, num_diagnostic_codes, num_procedures
-                    FROM facts_consultation fc
-                    RIGHT JOIN client c ON fc.vat = c.vat_id
-                    ORDER BY vat_id
-                    """,
-                    {},
-                )
-                clients_facts = cur.fetchall()
-                return clients_facts
-
 def fetch_consultation_details(client_id, consultation_date, doctor_id):
     log.debug(f"Client ID: {client_id} DateTime: {consultation_date} Doctor ID: {doctor_id}")
     with psycopg.connect(conninfo=DATABASE_URL) as conn:
@@ -248,7 +233,6 @@ def fetch_consultation_details(client_id, consultation_date, doctor_id):
                 {"client_id":client_id, "doctor_id":doctor_id, "consultation_date":consultation_date},
             )
             appointment_details = cur.fetchall()
-            log.debug(appointment_details)
         return appointment_details
 
 def query_lab_for_medication(med_name):
@@ -313,25 +297,51 @@ def create_consultation(doctor_id, nurse_id, consultation_date, diag_id, soap_s,
     except Exception as e:
         log.error(f"Error in create_consultation: {e}")
 
+def fetch_client_cons(client_id):
+    try:
+        with psycopg.connect(conninfo=DATABASE_URL) as conn:
+            with conn.cursor(row_factory=namedtuple_row) as cur:
+                cur.execute(
+                    """
+                    SELECT dd.year_ AS year, SUM(fc.num_diagnostic_codes) AS total_diagnostic_codes, SUM(fc.num_procedures) AS total_procedures
+                    FROM facts_consultations fc
+                    JOIN dim_date dd ON fc.date = dd.date
+                    WHERE fc.VAT = %(client_id)s
+                    GROUP BY ROLLUP(dd.year_)
+                    ORDER BY year;
+                    """,
+                    {"client_id":client_id},
+                ) 
+                client_cons_data = cur.fetchall()
+            return client_cons_data
+    except Exception as e:
+        log.error(f"Error in create_consultation: {e}")
+
 def aggregate_consultations(clients_data):
     aggregated_clients = []
     for client in clients_data:
         update_idx = None
-        client_id, name, zip_code, date, num_diag, num_proc = client
-        log.debug(f"CLIENT: {client_id}")
-        consultation = {'date': date, 'num_diag': num_diag, 'num_proc': num_proc}
+        client_id, name, _, _, _ = client
+        client_cons_data = fetch_client_cons(client_id)
+        log.debug(client_cons_data)
 
         for idx, aggregated_client in enumerate(aggregated_clients):
-            log.debug(f"AGGREG: {aggregated_client}")
             if aggregated_client['id'] == client_id:
                 update_idx = idx
                 break
         if update_idx is not None:
-            # Client exists, append the new consultation to the existing client's consultations list
-            aggregated_clients[idx]['consultations'].append(consultation)
+            continue
         else:
             # Client doesn't exist, create a new entry
-            new_client_entry = {'id': client_id, 'name': name, 'zip': zip_code, 'consultations': [consultation]}
+            new_client_entry = {'id': client_id, 'name': name,
+                                'consultations': 
+                                    [{
+                                        'year': int(row.year) if row.year is not None else None,
+                                        'total_diagnostic_codes': int(row.total_diagnostic_codes) if row.total_diagnostic_codes is not None else 0,
+                                        'total_procedures': int(row.total_procedures) if row.total_procedures is not None else 0
+                                    }
+                                     for row in client_cons_data]
+                                }
             aggregated_clients.append(new_client_entry)
 
     return aggregated_clients
@@ -358,7 +368,6 @@ def doctors_index():
         time = datetime.strptime(request.form.get("time"), "%H:%M").time()
         combined_datetime = datetime.combine(date, time)
         timestamp_str = combined_datetime.strftime('%Y-%m-%d %H:%M:%S')
-        log.debug(f"DATETIME STR: {timestamp_str}")
         doctors = fetch_doctors(timestamp_str)
     else:
         doctors = fetch_doctors()
@@ -368,8 +377,7 @@ def doctors_index():
 @app.route("/dashboard", methods=("GET",))
 def dashboard_index():
     """Show the dashboard."""
-    client_facts = fetch_clients_facts()
-    log.debug(client_facts)
+    client_facts = fetch_clients()
     clients = aggregate_consultations(client_facts)
     return render_template("clinic/dashboard.html", clients=clients)
 
@@ -430,8 +438,6 @@ def create_consultation_view(client_id, doctor_id, consultation_date):
     medications = fetch_meds()
     diagnostic_codes = fetch_diag()
     if request.method == "POST":
-        log.debug("POSTTTT")
-
         nurse_id = request.form.get("nurse_id")
         soap_s = request.form.get("soap_s")
         soap_o = request.form.get("soap_o")
@@ -440,11 +446,9 @@ def create_consultation_view(client_id, doctor_id, consultation_date):
         diag_id = request.form.get("diag_code")
         # Diagnostic Codes
         num_presc = int(request.form.get("num_presc"))
-        log.debug(f"NUM PRESC: {num_presc}")
         prescriptions = []
         for i in range(num_presc):
             med_name = request.form.getlist("med_name[]")[i]
-            log.debug(med_name)
             med_lab = query_lab_for_medication(med_name)[0]
             dosage = request.form.getlist("dosage[]")[i]
             description = request.form.getlist("description[]")[i]
@@ -455,12 +459,10 @@ def create_consultation_view(client_id, doctor_id, consultation_date):
                 "dosage": dosage,
                 "description": description
             })
-        log.debug(f"Doctor ID: {doctor_id} Date: {consultation_date}")
         create_consultation(doctor_id, nurse_id, consultation_date, diag_id, soap_s, soap_o, soap_a, soap_p, prescriptions)
         return redirect(url_for('consultation_details_view', client_id=client_id, doctor_id=doctor_id, consultation_date=consultation_date))
 
     else:
-        log.debug("HEYYYY")
         return render_template("clinic/create_consultation.html", client_id=client_id, doctor_id=doctor_id, consultation_date=consultation_date, nurses=nurses, medications=medications, diagnostic_codes=diagnostic_codes)
 
 @app.route("/consultation/<client_id>/<doctor_id>/<consultation_date>", methods=("GET",))
@@ -468,7 +470,6 @@ def consultation_details_view(client_id, doctor_id, consultation_date):
     """Show client's consultation details."""
     log.debug(f"Doctor ID: {doctor_id} Date: {consultation_date}")
     appointment_details = fetch_consultation_details(client_id, consultation_date, doctor_id)
-    log.debug(appointment_details[0].med_name)
     prescription = None
     if appointment_details[0].med_name != None:
         prescription = "\n".join([
@@ -477,11 +478,6 @@ def consultation_details_view(client_id, doctor_id, consultation_date):
         ])
     return render_template("clinic/consultation_profile.html", client_id=client_id, appointment_details=appointment_details[0], prescription=prescription)
 
-@app.route("/ping", methods=("GET",))
-def ping():
-    log.debug("ping!")
-    return jsonify({"message": "pong!", "status": "success"})
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
 

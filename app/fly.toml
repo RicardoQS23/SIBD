@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for bdist-bankapp on 2023-11-07T17:21:16Z
+# fly.toml app configuration file generated for clinic-app on 2023-11-07T17:21:16Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "bdist-bankapp"
+app = "clinic-app"
 primary_region = "mad"
 swap_size_mb = 256
 
