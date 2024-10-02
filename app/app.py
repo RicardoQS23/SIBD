@@ -7,8 +7,7 @@ import psycopg
 from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 from psycopg.rows import namedtuple_row
 from datetime import datetime
-# postgres://{user}:{password}@{hostname}:{port}/{database-name}
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgres://ist1100071:bbwg6477@postgres/ist1100071")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgres://{user}:{password}@{hostname}:{port}/{database-name}")
 
 dictConfig(
     {
