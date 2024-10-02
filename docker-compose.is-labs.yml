@@ -22,9 +22,9 @@ services:
       - "shared_preload_libraries=pg_stat_statements"
     shm_size: "256m"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
     ports:
       - "5432:5432"
     networks:
@@ -38,8 +38,8 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: pgadmin@tecnico.pt
-      PGADMIN_DEFAULT_PASSWORD: pgadmin
+      PGADMIN_DEFAULT_EMAIL: email
+      PGADMIN_DEFAULT_PASSWORD: password
     ports:
       - "10000:80"
     networks:
@@ -86,7 +86,7 @@ services:
     depends_on:
       - postgres
     environment:
-      DATABASE_URL: postgres://bank:bank@postgres/bank
+      DATABASE_URL: database
       FLASK_APP: app
       FLASK_ENV: development
       FLASK_DEBUG: 1
